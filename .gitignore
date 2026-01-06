@@ -1,0 +1,144 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+.idea/
+*.iml
+
+# =========================
+# Logs
+# =========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =========================
+# Node / JS (monorepo)
+# =========================
+node_modules/
+**/node_modules/
+
+.next/
+**/.next/
+
+out/
+**/out/
+
+dist/
+**/dist/
+
+build/
+**/build/
+
+.turbo/
+**/.turbo/
+
+.coverage/
+coverage/
+**/.coverage/
+**/coverage/
+
+.eslintcache
+**/.eslintcache
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Package managers
+.pnpm-store/
+**/.pnpm-store/
+
+.yarn/
+**/.yarn/
+.pnp.*
+**/.pnp.*
+
+# Optional: lockfiles policy
+# (uncomment if you DON'T want multiple lockfiles in subprojects)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# =========================
+# Terraform / OpenTofu
+# =========================
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# Keep shared example files
+!**/*.tfvars.example
+
+# Terraform plan files
+*.tfplan
+*.tfplan.*
+
+# Local schema / generated / debug
+schema.json
+**/schema.json
+
+# =========================
+# PlatformIO / Arduino / ESP32
+# =========================
+.pio/
+**/.pio/
+
+# Arduino IDE
+*.arduino.json
+*.arduino
+*.ino.bak
+
+# PlatformIO build artifacts
+**/.pioenvs/
+**/.piolibdeps/
+
+# =========================
+# Python (if you add scripts later)
+# =========================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+**/.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# =========================
+# Misc
+# =========================
+*.swp
+*.swo
+*~
