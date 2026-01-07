@@ -1,11 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { chartData } from "../src/routes/chart-data";
+import { createSession } from "../src/lib/session";
 
 describe("chart-data route", () => {
   const env = { DATABASE_URL: "test" };
 
-  it("returns ok with series and device id", async () => {
-    const response = await chartData(new Request("http://localhost/v1/chart-data"), env);
+  it("returns ok with series and device id when authorized", async () => {
+    const { id } = createSession("user@example.com");
+    const response = await chartData(
+      new Request("http://localhost/v1/chart-data", {
+        headers: { authorization: `Bearer ${id}` },
+      }),
+      env
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);

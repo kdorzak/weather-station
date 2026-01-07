@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState, type FormEvent } from "react";
 
 type ChartPoint = { ts: string; value: number };
 type ChartSeries = { metric: string; label: string; unit: string; data: ChartPoint[] };
@@ -9,22 +12,15 @@ type ChartResponse = {
   series: ChartSeries[];
 };
 
+type MeResponse =
+  | { status: "ok"; user: { email: string }; csrf_token: string }
+  | { status: "unauthenticated" };
+
+const apiBase =
+  (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8787").replace(/\/$/, "");
+
 const formatNumber = (v: number | undefined, digits = 1) =>
   typeof v === "number" ? v.toFixed(digits) : "—";
-
-const getChartData = async (): Promise<ChartResponse | null> => {
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://localhost:8787";
-  try {
-    const res = await fetch(`${base}/v1/chart-data`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as ChartResponse;
-    if (json?.status !== "ok") return null;
-    return json;
-  } catch {
-    return null;
-  }
-};
 
 const latestByMetric = (series: ChartSeries[]) => {
   const map = new Map<string, { value: number; ts: string; unit: string; label: string }>();
@@ -49,14 +45,142 @@ const historyRows = (series: ChartSeries[]) => {
     .map(([ts, metrics]) => ({ ts, metrics }));
 };
 
-const Home = async () => {
-  const data = await getChartData();
+const Home = () => {
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [csrf, setCsrf] = useState<string | null>(null);
+  const [data, setData] = useState<ChartResponse | null>(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMe = async () => {
+    try {
+      const res = await fetch(`${apiBase}/auth/me`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = (await res.json()) as MeResponse;
+      if (json.status === "ok") {
+        setUserEmail(json.user.email);
+        setCsrf(json.csrf_token);
+        return true;
+      }
+      setUserEmail(null);
+      setCsrf(null);
+      return false;
+    } catch {
+      setUserEmail(null);
+      setCsrf(null);
+      return false;
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch(`${apiBase}/v1/chart-data`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setError("Failed to load data (auth required?)");
+        setData(null);
+        return;
+      }
+      const json = (await res.json()) as ChartResponse;
+      if (json.status !== "ok") {
+        setError("Failed to load data");
+        setData(null);
+        return;
+      }
+      setData(json);
+      setError(null);
+    } catch {
+      setError("Failed to load data");
+      setData(null);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const authed = await fetchMe();
+      if (authed) {
+        await fetchData();
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const onLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const res = await fetch(`${apiBase}/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: loginEmail }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        setError(body?.message ?? "Login failed");
+        return;
+      }
+      const body = await res.json();
+      setUserEmail(body.user.email);
+      setCsrf(body.csrf_token);
+      await fetchData();
+    } catch {
+      setError("Login failed");
+    }
+  };
+
+  const onLogout = async () => {
+    await fetch(`${apiBase}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    setUserEmail(null);
+    setCsrf(null);
+    setData(null);
+  };
+
+  if (loading) {
+    return (
+      <section className="card">
+        <h2>Loading…</h2>
+      </section>
+    );
+  }
+
+  if (!userEmail) {
+    return (
+      <section className="card" aria-label="Login">
+        <h2>Login to view data</h2>
+        <form onSubmit={onLogin} className="grid" style={{ gap: 8, maxWidth: 360 }}>
+          <input
+            type="email"
+            required
+            placeholder="you@example.com"
+            value={loginEmail}
+            onChange={(e) => setLoginEmail(e.target.value)}
+          />
+          <button type="submit">Login</button>
+        </form>
+        {error && <p className="sub" style={{ color: "var(--accent, #c00)" }}>{error}</p>}
+      </section>
+    );
+  }
 
   if (!data) {
     return (
-      <section className="card" aria-label="API unavailable">
-        <h2>Data unavailable</h2>
-        <p className="sub">Could not load demo data from the API.</p>
+      <section className="card" aria-label="No data">
+        <h2>No data yet</h2>
+        <p className="sub">{error ?? "Could not load chart data."}</p>
+        <button onClick={fetchData}>Retry</button>
+        <button onClick={onLogout} style={{ marginLeft: 8 }}>
+          Logout
+        </button>
       </section>
     );
   }
@@ -75,6 +199,7 @@ const Home = async () => {
               timeStyle: "short",
             })}
           </p>
+          <p className="sub">Signed in as {userEmail}</p>
           <div className="grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
             <div>
               <div className="sub">Temperature</div>
@@ -101,6 +226,9 @@ const Home = async () => {
               </div>
             </div>
           </div>
+          <button onClick={onLogout} style={{ marginTop: 12 }}>
+            Logout
+          </button>
         </article>
         <article className="card" aria-labelledby="device-meta">
           <h2 id="device-meta">Device</h2>

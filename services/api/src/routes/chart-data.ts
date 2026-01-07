@@ -1,6 +1,13 @@
 import { Handler, json } from "../lib/http";
+import { getSession, getSessionIdFromRequest } from "../lib/session";
 
-export const chartData: Handler = async () => {
+const sessionCookieName = "ws_session";
+
+export const chartData: Handler = async (request) => {
+  const sessionId = getSessionIdFromRequest(request, sessionCookieName);
+  const session = getSession(sessionId);
+  if (!session) return json({ error: "unauthorized" }, { status: 401 });
+
   // Dummy chart/demo data — replace with real persistence later.
   const now = Date.now();
   const stepMs = 60 * 1000;

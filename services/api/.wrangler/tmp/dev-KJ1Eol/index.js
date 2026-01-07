@@ -6,6 +6,36 @@ var json = /* @__PURE__ */ __name((data, init) => new Response(JSON.stringify(da
   headers: { "content-type": "application/json" },
   ...init
 }), "json");
+var getCookie = /* @__PURE__ */ __name((cookieHeader, name) => {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(";").map((p) => p.trim());
+  for (const part of parts) {
+    if (part.startsWith(`${name}=`)) {
+      return decodeURIComponent(part.substring(name.length + 1));
+    }
+  }
+  return null;
+}, "getCookie");
+var buildCorsHeaders = /* @__PURE__ */ __name((request) => {
+  const origin = request.headers.get("origin");
+  const allowOrigin = origin || "*";
+  return {
+    "access-control-allow-origin": allowOrigin,
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "content-type,authorization",
+    "access-control-allow-credentials": "true"
+  };
+}, "buildCorsHeaders");
+var withCors = /* @__PURE__ */ __name((response, request) => {
+  const headers = new Headers(response.headers);
+  const cors = buildCorsHeaders(request);
+  Object.entries(cors).forEach(([k, v]) => headers.set(k, v));
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}, "withCors");
 
 // src/routes/health.ts
 var health = /* @__PURE__ */ __name(async () => json({ status: "ok", service: "weather-station-api" }), "health");
@@ -136,8 +166,45 @@ var ingest = /* @__PURE__ */ __name(async (request) => {
   return json({ status: "ok", ingested: accepted.length });
 }, "ingest");
 
+// src/lib/session.ts
+var sessions = /* @__PURE__ */ new Map();
+var randomId = /* @__PURE__ */ __name(() => crypto.randomUUID(), "randomId");
+var createSession = /* @__PURE__ */ __name((email) => {
+  const id = randomId();
+  const csrfToken = randomId();
+  sessions.set(id, { user: { email }, csrfToken, createdAt: Date.now() });
+  return { id, csrfToken };
+}, "createSession");
+var getSession = /* @__PURE__ */ __name((id) => {
+  if (!id) return null;
+  return sessions.get(id) ?? null;
+}, "getSession");
+var deleteSession = /* @__PURE__ */ __name((id) => {
+  if (!id) return;
+  sessions.delete(id);
+}, "deleteSession");
+var getSessionIdFromRequest = /* @__PURE__ */ __name((request, cookieName) => {
+  const auth = request.headers.get("authorization");
+  if (auth?.toLowerCase().startsWith("bearer ")) {
+    return auth.slice(7).trim();
+  }
+  const cookie = request.headers.get("cookie");
+  if (!cookie) return null;
+  const parts = cookie.split(";").map((p) => p.trim());
+  for (const part of parts) {
+    if (part.startsWith(`${cookieName}=`)) {
+      return decodeURIComponent(part.substring(cookieName.length + 1));
+    }
+  }
+  return null;
+}, "getSessionIdFromRequest");
+
 // src/routes/chart-data.ts
-var chartData = /* @__PURE__ */ __name(async () => {
+var sessionCookieName = "ws_session";
+var chartData = /* @__PURE__ */ __name(async (request) => {
+  const sessionId = getSessionIdFromRequest(request, sessionCookieName);
+  const session = getSession(sessionId);
+  if (!session) return json({ error: "unauthorized" }, { status: 401 });
   const now = Date.now();
   const stepMs = 60 * 1e3;
   const points = Array.from({ length: 12 }, (_, i) => {
@@ -184,18 +251,95 @@ var chartData = /* @__PURE__ */ __name(async () => {
   });
 }, "chartData");
 
+// src/routes/auth.ts
+var sessionCookieName2 = "ws_session";
+var parseAllowlist = /* @__PURE__ */ __name((env) => (env.ALLOWLIST_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean), "parseAllowlist");
+var login = /* @__PURE__ */ __name(async (request, env) => {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, { status: 405 });
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "invalid_payload", message: "Invalid JSON" }, { status: 400 });
+  }
+  const email = body.email?.trim().toLowerCase();
+  if (!email) {
+    return json({ error: "invalid_payload", message: "email is required" }, { status: 400 });
+  }
+  const allowlist = parseAllowlist(env);
+  if (allowlist.length > 0 && !allowlist.includes(email)) {
+    return json({ error: "forbidden", message: "User not allowed" }, { status: 403 });
+  }
+  const session = createSession(email);
+  const secure = request.url.startsWith("https:");
+  const sameSite = secure ? "None" : "Lax";
+  return json(
+    {
+      status: "ok",
+      user: { email },
+      session_id: session.id,
+      csrf_token: session.csrfToken
+    },
+    {
+      headers: {
+        "set-cookie": `${sessionCookieName2}=${encodeURIComponent(
+          session.id
+        )}; HttpOnly; Path=/; SameSite=${sameSite}${secure ? "; Secure" : ""}`
+      }
+    }
+  );
+}, "login");
+var me = /* @__PURE__ */ __name(async (request) => {
+  const sessionId = getSessionIdFromRequest(request, sessionCookieName2) ?? getCookie(request.headers.get("cookie"), sessionCookieName2);
+  const session = getSession(sessionId);
+  if (!session) {
+    return json({ status: "unauthenticated" }, { status: 401 });
+  }
+  return json({
+    status: "ok",
+    user: session.user,
+    csrf_token: session.csrfToken
+  });
+}, "me");
+var logout = /* @__PURE__ */ __name(async (request) => {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, { status: 405 });
+  }
+  const sessionId = getSessionIdFromRequest(request, sessionCookieName2) ?? getCookie(request.headers.get("cookie"), sessionCookieName2);
+  deleteSession(sessionId);
+  const secure = request.url.startsWith("https:");
+  const sameSite = secure ? "None" : "Lax";
+  return json(
+    { status: "ok" },
+    {
+      headers: {
+        "set-cookie": `${sessionCookieName2}=deleted; Path=/; Max-Age=0; SameSite=${sameSite}${secure ? "; Secure" : ""}`
+      }
+    }
+  );
+}, "logout");
+
 // src/index.ts
 var notFound = /* @__PURE__ */ __name(async () => json({ error: "Not Found" }, { status: 404 }), "notFound");
 var route = /* @__PURE__ */ __name((pathname) => {
   if (pathname === "/health") return health;
   if (pathname === "/v1/ingest") return ingest;
   if (pathname === "/v1/chart-data") return chartData;
+  if (pathname === "/auth/login") return login;
+  if (pathname === "/auth/me") return me;
+  if (pathname === "/auth/logout") return logout;
   return notFound;
 }, "route");
 var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
-    return route(url.pathname)(request, env);
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: buildCorsHeaders(request) });
+    }
+    const res = await route(url.pathname)(request, env);
+    return withCors(res, request);
   }
 };
 
@@ -240,7 +384,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-4MJQWo/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-u7olcv/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -272,7 +416,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-4MJQWo/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-u7olcv/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
