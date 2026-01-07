@@ -20,16 +20,3 @@ variable "cloudflare_api_token" {
   type        = string
   sensitive   = true
 }
-
-variable "database_url" {
-  description = "Database connection URL (secret). Placeholder is fine for now."
-  type        = string
-  sensitive   = true
-  default     = "REPLACE_ME"
-}
-
-variable "cloudflare_workers_subdomain" {
-  description = "Cloudflare workers.dev account subdomain (visible in the Workers dashboard)."
-  type        = string
-  default     = "kdorzak"
-}
