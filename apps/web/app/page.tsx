@@ -5,6 +5,24 @@ import { useRouter } from "next/navigation";
 import { useDashboardData } from "./lib/hooks/useDashboardData";
 import { Skeleton } from "./components/Skeleton";
 import { formatNumber } from "./lib/format";
+import { useEffect } from "react";
+import {
+  Box,
+  Card,
+  CardContent,
+  CardHeader,
+  Divider,
+  Grid,
+  Button,
+  Typography,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Stack,
+  Chip,
+} from "@mui/material";
 
 type ChartPoint = { ts: string; value: number };
 type ChartSeries = { metric: string; label: string; unit: string; data: ChartPoint[] };
@@ -36,57 +54,69 @@ const Home = () => {
   const router = useRouter();
   const { userEmail, data, loading, error, reload, logout } = useDashboardData();
 
-  // Redirect if unauthenticated once loading finishes.
-  if (!loading && !userEmail) {
-    router.replace("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !userEmail) {
+      router.replace("/login");
+    }
+  }, [loading, userEmail, router]);
 
   if (loading) {
     return (
-      <section className="card">
-        <h2>Loading…</h2>
-        <div className="grid" style={{ gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginTop: 12 }}>
-          <Skeleton height={22} />
-          <Skeleton height={22} />
-          <Skeleton height={22} />
-          <Skeleton height={22} />
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <Skeleton height={20} width="40%" />
-          <div style={{ marginTop: 8 }}>
-            <Skeleton height={14} width="100%" />
-            <Skeleton height={14} width="90%" />
-            <Skeleton height={14} width="80%" />
-          </div>
-        </div>
-      </section>
+      <Card>
+        <CardHeader title="Loading…" />
+        <CardContent>
+          <Grid container spacing={2}>
+            {[1, 2, 3, 4].map((k) => (
+              <Grid item xs={6} key={k}>
+                <Skeleton height={22} />
+                <Skeleton height={16} style={{ marginTop: 8 }} />
+              </Grid>
+            ))}
+          </Grid>
+        </CardContent>
+      </Card>
     );
   }
 
   if (error && !data) {
     return (
-      <section className="card" aria-label="Error">
-        <h2>Could not load data</h2>
-        <p className="sub">{error}</p>
-        <button onClick={reload}>Retry</button>
-        <button onClick={logout} style={{ marginLeft: 8 }}>
-          Logout
-        </button>
-      </section>
+      <Card>
+        <CardHeader title="Could not load data" />
+        <CardContent>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button variant="contained" onClick={reload}>
+              Retry
+            </Button>
+            <Button variant="outlined" onClick={logout}>
+              Logout
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!data) {
     return (
-      <section className="card" aria-label="No data">
-        <h2>No data yet</h2>
-        <p className="sub">{error ?? "Could not load chart data."}</p>
-        <button onClick={reload}>Retry</button>
-        <button onClick={logout} style={{ marginLeft: 8 }}>
-          Logout
-        </button>
-      </section>
+      <Card>
+        <CardHeader title="No data yet" />
+        <CardContent>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            {error ?? "Could not load chart data."}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button variant="contained" onClick={reload}>
+              Retry
+            </Button>
+            <Button variant="outlined" onClick={logout}>
+              Logout
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -94,102 +124,117 @@ const Home = () => {
   const rows = historyRows(data.series);
 
   return (
-    <>
-      <section className="grid" aria-label="Latest snapshot">
-        <article className="card" aria-labelledby="latest">
-          <h2 id="latest">Latest reading</h2>
-          <p className="sub">
-            {new Date(data.updated_at).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
-          </p>
-          <p className="sub">Signed in as {userEmail}</p>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
-            <div>
-              <div className="sub">Temperature</div>
-              <div className="reading">
-                {formatNumber(latest.get("temperature")?.value)}°C
-              </div>
-            </div>
-            <div>
-              <div className="sub">Humidity</div>
-              <div className="reading">
-                {formatNumber(latest.get("humidity")?.value, 0)}%
-              </div>
-            </div>
-            <div>
-              <div className="sub">Pressure</div>
-              <div className="reading">
-                {formatNumber(latest.get("pressure")?.value, 1)} hPa
-              </div>
-            </div>
-            <div>
-              <div className="sub">Battery</div>
-              <div className="reading">
-                {formatNumber(latest.get("battery_voltage")?.value, 3)} V
-              </div>
-            </div>
-          </div>
-          <button onClick={logout} style={{ marginTop: 12 }}>
-            Logout
-          </button>
-        </article>
-        <article className="card" aria-labelledby="device-meta">
-          <h2 id="device-meta">Device</h2>
-          <p className="sub">Station metadata</p>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
-            <div>
-              <div className="sub">Device ID</div>
-              <div className="reading" style={{ fontSize: 18 }}>{data.device_id}</div>
-            </div>
-            <div>
-              <div className="sub">Location</div>
-              <div className="reading" style={{ fontSize: 18 }}>
-                40.713, -74.006
-              </div>
-            </div>
-          </div>
-          <p className="sub" style={{ marginTop: 12 }}>
-            <Link href="/about">About this project →</Link>
-          </p>
-        </article>
-      </section>
+    <Stack spacing={2}>
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={8}>
+          <Card>
+            <CardHeader
+              title="Latest reading"
+              subheader={new Date(data.updated_at).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+              action={<Chip size="small" label={`Signed in as ${userEmail}`} />}
+            />
+            <CardContent>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Temperature
+                  </Typography>
+                  <Typography variant="h4">
+                    {formatNumber(latest.get("temperature")?.value)}°C
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Humidity
+                  </Typography>
+                  <Typography variant="h4">
+                    {formatNumber(latest.get("humidity")?.value, 0)}%
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Pressure
+                  </Typography>
+                  <Typography variant="h5">
+                    {formatNumber(latest.get("pressure")?.value, 1)} hPa
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Battery
+                  </Typography>
+                  <Typography variant="h5">
+                    {formatNumber(latest.get("battery_voltage")?.value, 3)} V
+                  </Typography>
+                </Grid>
+              </Grid>
+              <Button onClick={logout} sx={{ mt: 2 }} variant="outlined">
+                Logout
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardHeader title="Device" subheader="Station metadata" />
+            <CardContent>
+              <Stack spacing={1.5}>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Device ID
+                  </Typography>
+                  <Typography variant="body1">{data.device_id}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Location
+                  </Typography>
+                  <Typography variant="body1">40.713, -74.006</Typography>
+                </Box>
+                <Link href="/about">About this project →</Link>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-      <section className="card" style={{ marginTop: 16 }} aria-label="Recent readings">
-        <h2>Recent readings</h2>
-        <p className="sub">Dummy data served from the API.</p>
-        <div style={{ overflowX: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Temp</th>
-                <th>Humidity</th>
-                <th>Pressure</th>
-                <th>Battery</th>
-              </tr>
-            </thead>
-            <tbody>
+      <Card>
+        <CardHeader title="Recent readings" subheader="Dummy data served from the API." />
+        <Divider />
+        <CardContent sx={{ p: 0 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Time</TableCell>
+                <TableCell>Temp</TableCell>
+                <TableCell>Humidity</TableCell>
+                <TableCell>Pressure</TableCell>
+                <TableCell>Battery</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {rows.map(({ ts, metrics }) => (
-                <tr key={ts}>
-                  <td>
+                <TableRow key={ts}>
+                  <TableCell>
                     {new Date(ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
-                  </td>
-                  <td>{formatNumber(metrics.temperature)}°C</td>
-                  <td>{formatNumber(metrics.humidity, 0)}%</td>
-                  <td>{formatNumber(metrics.pressure, 1)} hPa</td>
-                  <td>{formatNumber(metrics.battery_voltage, 3)} V</td>
-                </tr>
+                  </TableCell>
+                  <TableCell>{formatNumber(metrics.temperature)}°C</TableCell>
+                  <TableCell>{formatNumber(metrics.humidity, 0)}%</TableCell>
+                  <TableCell>{formatNumber(metrics.pressure, 1)} hPa</TableCell>
+                  <TableCell>{formatNumber(metrics.battery_voltage, 3)} V</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </Stack>
   );
 };
 
