@@ -12,6 +12,7 @@
     "next": "latest",
     "react-dom": "^18.2.0",
     "react": "^18.2.0",
+    "swr": "^2.2.5",
     "serve": "^14.2.0",
     "typescript": "^5.9.3"
   }

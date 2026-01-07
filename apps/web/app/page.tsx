@@ -1,26 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useDashboardData } from "./lib/hooks/useDashboardData";
+import { Skeleton } from "./components/Skeleton";
+import { formatNumber } from "./lib/format";
 
 type ChartPoint = { ts: string; value: number };
 type ChartSeries = { metric: string; label: string; unit: string; data: ChartPoint[] };
-type ChartResponse = {
-  status: "ok";
-  device_id: string;
-  updated_at: string;
-  series: ChartSeries[];
-};
-
-type MeResponse =
-  | { status: "ok"; user: { email: string }; csrf_token: string }
-  | { status: "unauthenticated" };
-
-const apiBase =
-  (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8787").replace(/\/$/, "");
-
-const formatNumber = (v: number | undefined, digits = 1) =>
-  typeof v === "number" ? v.toFixed(digits) : "—";
 
 const latestByMetric = (series: ChartSeries[]) => {
   const map = new Map<string, { value: number; ts: string; unit: string; label: string }>();
@@ -46,128 +33,46 @@ const historyRows = (series: ChartSeries[]) => {
 };
 
 const Home = () => {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [csrf, setCsrf] = useState<string | null>(null);
-  const [data, setData] = useState<ChartResponse | null>(null);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { userEmail, data, loading, error, reload, logout } = useDashboardData();
 
-  const fetchMe = async () => {
-    try {
-      const res = await fetch(`${apiBase}/auth/me`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const json = (await res.json()) as MeResponse;
-      if (json.status === "ok") {
-        setUserEmail(json.user.email);
-        setCsrf(json.csrf_token);
-        return true;
-      }
-      setUserEmail(null);
-      setCsrf(null);
-      return false;
-    } catch {
-      setUserEmail(null);
-      setCsrf(null);
-      return false;
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      const res = await fetch(`${apiBase}/v1/chart-data`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        setError("Failed to load data (auth required?)");
-        setData(null);
-        return;
-      }
-      const json = (await res.json()) as ChartResponse;
-      if (json.status !== "ok") {
-        setError("Failed to load data");
-        setData(null);
-        return;
-      }
-      setData(json);
-      setError(null);
-    } catch {
-      setError("Failed to load data");
-      setData(null);
-    }
-  };
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const authed = await fetchMe();
-      if (authed) {
-        await fetchData();
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  const onLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      const res = await fetch(`${apiBase}/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: loginEmail }),
-      });
-      if (!res.ok) {
-        const body = await res.json();
-        setError(body?.message ?? "Login failed");
-        return;
-      }
-      const body = await res.json();
-      setUserEmail(body.user.email);
-      setCsrf(body.csrf_token);
-      await fetchData();
-    } catch {
-      setError("Login failed");
-    }
-  };
-
-  const onLogout = async () => {
-    await fetch(`${apiBase}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-    setUserEmail(null);
-    setCsrf(null);
-    setData(null);
-  };
+  // Redirect if unauthenticated once loading finishes.
+  if (!loading && !userEmail) {
+    router.replace("/login");
+    return null;
+  }
 
   if (loading) {
     return (
       <section className="card">
         <h2>Loading…</h2>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginTop: 12 }}>
+          <Skeleton height={22} />
+          <Skeleton height={22} />
+          <Skeleton height={22} />
+          <Skeleton height={22} />
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <Skeleton height={20} width="40%" />
+          <div style={{ marginTop: 8 }}>
+            <Skeleton height={14} width="100%" />
+            <Skeleton height={14} width="90%" />
+            <Skeleton height={14} width="80%" />
+          </div>
+        </div>
       </section>
     );
   }
 
-  if (!userEmail) {
+  if (error && !data) {
     return (
-      <section className="card" aria-label="Login">
-        <h2>Login to view data</h2>
-        <form onSubmit={onLogin} className="grid" style={{ gap: 8, maxWidth: 360 }}>
-          <input
-            type="email"
-            required
-            placeholder="you@example.com"
-            value={loginEmail}
-            onChange={(e) => setLoginEmail(e.target.value)}
-          />
-          <button type="submit">Login</button>
-        </form>
-        {error && <p className="sub" style={{ color: "var(--accent, #c00)" }}>{error}</p>}
+      <section className="card" aria-label="Error">
+        <h2>Could not load data</h2>
+        <p className="sub">{error}</p>
+        <button onClick={reload}>Retry</button>
+        <button onClick={logout} style={{ marginLeft: 8 }}>
+          Logout
+        </button>
       </section>
     );
   }
@@ -177,8 +82,8 @@ const Home = () => {
       <section className="card" aria-label="No data">
         <h2>No data yet</h2>
         <p className="sub">{error ?? "Could not load chart data."}</p>
-        <button onClick={fetchData}>Retry</button>
-        <button onClick={onLogout} style={{ marginLeft: 8 }}>
+        <button onClick={reload}>Retry</button>
+        <button onClick={logout} style={{ marginLeft: 8 }}>
           Logout
         </button>
       </section>
@@ -226,7 +131,7 @@ const Home = () => {
               </div>
             </div>
           </div>
-          <button onClick={onLogout} style={{ marginTop: 12 }}>
+          <button onClick={logout} style={{ marginTop: 12 }}>
             Logout
           </button>
         </article>
