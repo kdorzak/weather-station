@@ -11,7 +11,8 @@ resource "cloudflare_dns_record" "weather" {
   zone_id = data.cloudflare_zone.main.id
   type    = "CNAME"
   name    = "weather"
-  content = "${data.cloudflare_pages_project.weather_dashboard.subdomain}.pages.dev"
+  # `subdomain` already includes the `.pages.dev` suffix (e.g. `weather-station-6t1.pages.dev`)
+  content = data.cloudflare_pages_project.weather_dashboard.subdomain
   proxied = false
   ttl     = 1
 }

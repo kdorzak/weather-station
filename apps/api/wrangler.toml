@@ -1,9 +1,0 @@
-name = "weather-station-api"
-main = "src/index.ts"
-compatibility_date = "2025-01-01"
-workers_dev = true
-account_id = "d6e15ffdcc5bf89b9cc3d37d857ad009"
-
-[[routes]]
-pattern = "api.kdorzak.online"
-custom_domain = true
