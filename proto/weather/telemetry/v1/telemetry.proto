@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package weathera.telemetry.v1;
+
+// Canonical telemetry batch sent by a station/device.
+message TelemetryBatch {
+  // Schema marker for runtime checks / logging.
+  // Must be: "measurements.v1"
+  string schema = 1;
+
+  // Stable station identifier.
+  string device_id = 2;
+
+  // Unix epoch milliseconds (UTC) when the batch was sent.
+  uint64 sent_at_ms = 3;
+
+  // Monotonic sequence number per device (dedupe/replay detection).
+  uint64 seq = 4;
+
+  Firmware fw = 5;
+
+  repeated Reading readings = 6;
+}
+
+message Firmware {
+  string name = 1;
+  string version = 2;
+}
+
+message Reading {
+  // Unix epoch milliseconds (UTC) when the measurement was taken.
+  uint64 ts_ms = 1;
+
+  // Unique within a device.
+  string sensor_key = 2;
+
+  // Metric name (snake_case), e.g. "temperature", "pm2_5".
+  string metric = 3;
+
+  // Canonical unit string, e.g. "C", "Pa", "ug/m3".
+  string unit = 4;
+
+  oneof value {
+    double number_value = 5;
+    bool bool_value = 6;
+    string string_value = 7;
+  }
+
+  // Optional aggregation window (gusts, rolling average, etc.)
+  uint32 window_ms = 8;
+
+  Quality quality = 9;
+
+  // Optional machine-readable detail (e.g. "crc_fail").
+  string error_code = 10;
+}
+
+enum Quality {
+  QUALITY_UNSPECIFIED = 0;
+  OK = 1;
+  SUSPECT = 2;
+  ERROR = 3;
+}

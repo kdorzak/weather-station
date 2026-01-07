@@ -1,83 +1,76 @@
 import Link from "next/link";
 
-type Reading = {
-  ts: string;
-  sensor_key: string;
-  metric: string;
-  unit: string;
-  value: unknown;
-};
-
-type TelemetryBatchEnvelope = {
-  schema: "measurements.v1";
+type ChartPoint = { ts: string; value: number };
+type ChartSeries = { metric: string; label: string; unit: string; data: ChartPoint[] };
+type ChartResponse = {
+  status: "ok";
   device_id: string;
-  sent_at: string;
-  seq?: number;
-  fw?: { name?: string; version?: string };
-  readings: Reading[];
+  updated_at: string;
+  series: ChartSeries[];
 };
 
-const mockBatch: TelemetryBatchEnvelope = {
-  schema: "measurements.v1",
-  device_id: "device-nyc",
-  sent_at: "2025-01-01T00:00:10.000Z",
-  seq: 1234,
-  fw: { name: "esp32-sensors", version: "0.6.3" },
-  readings: [
-    { ts: "2025-01-01T00:00:00.000Z", sensor_key: "temp_ambient_1", metric: "temperature", unit: "C", value: 21.4 },
-    { ts: "2025-01-01T00:00:00.000Z", sensor_key: "temp_ambient_1", metric: "humidity", unit: "%RH", value: 42.1 },
-    { ts: "2025-01-01T00:00:00.000Z", sensor_key: "temp_ambient_1", metric: "pressure", unit: "hPa", value: 1012.3 },
-    { ts: "2025-01-01T00:00:00.000Z", sensor_key: "power_main", metric: "battery_voltage", unit: "V", value: 3.78 },
-    { ts: "2024-12-31T23:59:00.000Z", sensor_key: "temp_ambient_1", metric: "temperature", unit: "C", value: 21.1 },
-    { ts: "2024-12-31T23:59:00.000Z", sensor_key: "temp_ambient_1", metric: "humidity", unit: "%RH", value: 43.5 },
-    { ts: "2024-12-31T23:59:00.000Z", sensor_key: "temp_ambient_1", metric: "pressure", unit: "hPa", value: 1012.1 },
-    { ts: "2024-12-31T23:59:00.000Z", sensor_key: "power_main", metric: "battery_voltage", unit: "V", value: 3.77 },
-    { ts: "2024-12-31T23:58:00.000Z", sensor_key: "temp_ambient_1", metric: "temperature", unit: "C", value: 20.9 },
-    { ts: "2024-12-31T23:58:00.000Z", sensor_key: "temp_ambient_1", metric: "humidity", unit: "%RH", value: 44 },
-    { ts: "2024-12-31T23:58:00.000Z", sensor_key: "temp_ambient_1", metric: "pressure", unit: "hPa", value: 1011.9 },
-    { ts: "2024-12-31T23:58:00.000Z", sensor_key: "power_main", metric: "battery_voltage", unit: "V", value: 3.77 },
-  ],
+const formatNumber = (v: number | undefined, digits = 1) =>
+  typeof v === "number" ? v.toFixed(digits) : "—";
+
+const getChartData = async (): Promise<ChartResponse | null> => {
+  const base =
+    process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://localhost:8787";
+  try {
+    const res = await fetch(`${base}/v1/chart-data`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as ChartResponse;
+    if (json?.status !== "ok") return null;
+    return json;
+  } catch {
+    return null;
+  }
 };
 
-const latestReadingsByMetric = (readings: Reading[]) => {
-  const sorted = [...readings].sort(
-    (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
-  );
-  const map = new Map<string, Reading>();
-  for (const r of sorted) {
-    if (!map.has(r.metric)) {
-      map.set(r.metric, r);
-    }
+const latestByMetric = (series: ChartSeries[]) => {
+  const map = new Map<string, { value: number; ts: string; unit: string; label: string }>();
+  for (const s of series) {
+    const latest = [...s.data].sort(
+      (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
+    )[0];
+    if (latest) map.set(s.metric, { value: latest.value, ts: latest.ts, unit: s.unit, label: s.label });
   }
   return map;
 };
 
-const latestByMetric = latestReadingsByMetric(mockBatch.readings as Reading[]);
-
-const historyRows = (() => {
-  const grouped = new Map<string, Reading[]>();
-  for (const r of mockBatch.readings as Reading[]) {
-    const key = r.ts;
-    grouped.set(key, [...(grouped.get(key) ?? []), r]);
+const historyRows = (series: ChartSeries[]) => {
+  const grouped = new Map<string, Record<string, number>>();
+  for (const s of series) {
+    for (const point of s.data) {
+      grouped.set(point.ts, { ...(grouped.get(point.ts) ?? {}), [s.metric]: point.value });
+    }
   }
   return Array.from(grouped.entries())
     .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-    .map(([ts, readings]) => ({ ts, readings }));
-})();
+    .map(([ts, metrics]) => ({ ts, metrics }));
+};
 
-const formatNumber = (v: unknown, digits = 1) =>
-  typeof v === "number" ? v.toFixed(digits) : "—";
-const findMetric = (readings: Reading[], metric: string) =>
-  readings.find((r) => r.metric === metric);
+const Home = async () => {
+  const data = await getChartData();
 
-const Home = () => {
+  if (!data) {
+    return (
+      <section className="card" aria-label="API unavailable">
+        <h2>Data unavailable</h2>
+        <p className="sub">Could not load demo data from the API.</p>
+      </section>
+    );
+  }
+
+  const latest = latestByMetric(data.series);
+  const rows = historyRows(data.series);
+
   return (
     <>
       <section className="grid" aria-label="Latest snapshot">
         <article className="card" aria-labelledby="latest">
           <h2 id="latest">Latest reading</h2>
           <p className="sub">
-            {new Date(mockBatch.sent_at).toLocaleString(undefined, {
+            {new Date(data.updated_at).toLocaleString(undefined, {
               dateStyle: "medium",
               timeStyle: "short",
             })}
@@ -86,25 +79,25 @@ const Home = () => {
             <div>
               <div className="sub">Temperature</div>
               <div className="reading">
-                {formatNumber(latestByMetric.get("temperature")?.value)}°C
+                {formatNumber(latest.get("temperature")?.value)}°C
               </div>
             </div>
             <div>
               <div className="sub">Humidity</div>
               <div className="reading">
-                {formatNumber(latestByMetric.get("humidity")?.value, 0)}%
+                {formatNumber(latest.get("humidity")?.value, 0)}%
               </div>
             </div>
             <div>
               <div className="sub">Pressure</div>
               <div className="reading">
-                {formatNumber(latestByMetric.get("pressure")?.value, 1)} hPa
+                {formatNumber(latest.get("pressure")?.value, 1)} hPa
               </div>
             </div>
             <div>
               <div className="sub">Battery</div>
               <div className="reading">
-                {formatNumber(latestByMetric.get("battery_voltage")?.value, 2)} V
+                {formatNumber(latest.get("battery_voltage")?.value, 3)} V
               </div>
             </div>
           </div>
@@ -115,7 +108,7 @@ const Home = () => {
           <div className="grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
             <div>
               <div className="sub">Device ID</div>
-              <div className="reading" style={{ fontSize: 18 }}>{mockBatch.device_id}</div>
+              <div className="reading" style={{ fontSize: 18 }}>{data.device_id}</div>
             </div>
             <div>
               <div className="sub">Location</div>
@@ -132,7 +125,7 @@ const Home = () => {
 
       <section className="card" style={{ marginTop: 16 }} aria-label="Recent readings">
         <h2>Recent readings</h2>
-        <p className="sub">Static demo data — replace with API once available.</p>
+        <p className="sub">Dummy data served from the API.</p>
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>
@@ -145,26 +138,20 @@ const Home = () => {
               </tr>
             </thead>
             <tbody>
-              {historyRows.map(({ ts, readings }) => {
-                const temp = findMetric(readings, "temperature");
-                const hum = findMetric(readings, "humidity");
-                const press = findMetric(readings, "pressure");
-                const batt = findMetric(readings, "battery_voltage");
-                return (
-                  <tr key={ts}>
-                    <td>
-                      {new Date(ts).toLocaleTimeString(undefined, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td>{formatNumber(temp?.value)}°C</td>
-                    <td>{formatNumber(hum?.value, 0)}%</td>
-                    <td>{formatNumber(press?.value, 1)} hPa</td>
-                    <td>{formatNumber(batt?.value, 2)} V</td>
-                  </tr>
-                );
-              })}
+              {rows.map(({ ts, metrics }) => (
+                <tr key={ts}>
+                  <td>
+                    {new Date(ts).toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td>{formatNumber(metrics.temperature)}°C</td>
+                  <td>{formatNumber(metrics.humidity, 0)}%</td>
+                  <td>{formatNumber(metrics.pressure, 1)} hPa</td>
+                  <td>{formatNumber(metrics.battery_voltage, 3)} V</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

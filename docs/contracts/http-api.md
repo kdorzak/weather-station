@@ -1,40 +1,33 @@
 # HTTP API Contract (v1)
 
-This document defines the HTTP API used by stations (devices) to send telemetry
-to the backend.
+This document defines the HTTP API used by stations (devices) to send telemetry.
 
-It is aligned with the Telemetry Payload Contract:
-- schema: `measurements.v1`
-- batch-based ingestion
-- forward compatible (unknown fields ignored)
-
-Transport note:
-- HTTP is used initially
-- MQTT may be added later with the same payload shape
+Canonical payload encoding:
+- Protobuf message `weathera.telemetry.v1.TelemetryBatch`
+- Schema file: `proto/weathera/telemetry/v1/telemetry.proto`
 
 ---
 
 ## 1. Conventions
 
-### 1.1 Content Type
-Requests MUST use:
+### 1.1 Content Types
+Telemetry ingest SHOULD use:
+- `Content-Type: application/x-protobuf`
 
+(Optional for debugging only — may be disabled in production):
 - `Content-Type: application/json`
 
 ### 1.2 Timestamps
-- All timestamps MUST be UTC.
-- Timestamps MUST be RFC3339 / ISO-8601 (e.g. `2026-01-07T12:34:56Z`).
+- Protobuf uses Unix epoch milliseconds: `sent_at_ms`, `ts_ms` (UTC).
 
 ### 1.3 Forward Compatibility
-- Backend MUST ignore unknown fields.
-- Devices SHOULD NOT rely on backend rejecting unknown fields.
+- Backend MUST ignore unknown protobuf fields.
 
 ### 1.4 Idempotency and Retries
 Devices MAY retry sending the same batch.
 
-Recommendations:
-- include a monotonic `seq` per `device_id`
-- backend should tolerate duplicates (e.g. by deduplication key)
+Backend should deduplicate using:
+- (`device_id`, `seq`)
 
 ---
 
@@ -48,44 +41,30 @@ POST /v1/ingest
 
 ### Request Body
 
-Body MUST be a `measurements.v1` telemetry batch.
+### Request (Protobuf)
 
-```json
-{
-  "schema": "measurements.v1",
-  "device_id": "esp32-station-01",
-  "sent_at": "2026-01-07T12:34:56Z",
-  "seq": 18421,
-  "fw": { "name": "esp32-sensors", "version": "0.6.3" },
-  "readings": [
-    {
-      "ts": "2026-01-07T12:34:50Z",
-      "sensor_key": "temp_ambient_1",
-      "metric": "temperature",
-      "unit": "C",
-      "value": 22.84,
-      "quality": "ok"
-    }
-  ]
-}
+Body is serialized `TelemetryBatch`.
+
+Headers:
+- `Content-Type: application/x-protobuf`
+
+Example (sending a prepared binary file):
+```bash
+curl -X POST https://api.example.com/v1/ingest \
+  -H "Content-Type: application/x-protobuf" \
+  --data-binary "@batch.bin"
 ```
 
-### Required Validation (Backend)
+### Request (JSON debug mode, optional)
 
-Backend MUST validate at least:
-- `schema` is present and supported (`measurements.v1`)
-- `device_id` is present
-- `sent_at` is a valid timestamp
-- `readings` is a non-empty array
-- each reading has `ts`, `sensor_key`, `metric`, `unit`, `value`
-
-Backend SHOULD:
-- accept batches even if some readings are invalid (partial ingest), but MUST report it
-- store invalid readings as `quality: "error"` if you want to preserve them for debugging
+If enabled, the backend MAY accept a JSON representation for debugging.
+(If you use this, document the exact JSON mapping separately.)
 
 ---
 
 ## 3. Responses
+
+Responses are JSON for simplicity.
 
 ### 3.1 Success (All ingested)
 
@@ -107,7 +86,7 @@ Backend SHOULD:
     {
       "index": 5,
       "error": "invalid_timestamp",
-      "message": "ts must be RFC3339"
+      "message": "ts_ms must be a positive unix epoch (ms)"
     },
     {
       "index": 9,
@@ -132,12 +111,29 @@ Backend SHOULD:
 
 ---
 
-## 4. Optional Metadata Endpoints (Recommended)
+### 4. Validation Rules (Backend)
+
+Backend MUST validate at least:
+- `schema == "measurements.v1"`
+- `device_id` is non-empty
+- `readings` is non-empty
+- each reading has:
+  - `ts_ms > 0`
+  - `sensor_key` non-empty
+  - `metric` non-empty
+  - `unit` non-empty
+  - exactly one `oneof value` is set
+
+Backend SHOULD:
+- allow unknown metric values if namespaced (e.g. `custom.*`)
+- optionally enforce canonical units for known metrics
+
+## 5. Optional Metadata Endpoints (Recommended)
 
 These endpoints keep the telemetry payload lightweight.
 They are optional for prototypes but recommended once you have multiple devices/sensors.
 
-### 4.1 Upsert Device
+### 5.1 Upsert Device
 
 ```
 PUT /v1/devices/{device_id}
@@ -156,7 +152,7 @@ Recommended fields:
 - `location_id` (string)
 - `tags` (object)
 
-### 4.2 Upsert Sensor
+### 5.2 Upsert Sensor
 
 ```
 PUT /v1/devices/{device_id}/sensors/{sensor_key}
@@ -180,7 +176,7 @@ Recommended fields:
 - `install` (human meaning: ambient/soil/outdoor)
 - `calibration` (keep calibration history via `version`)
 
-### 4.3 Upsert Location (Optional)
+### 5.3 Upsert Location (Optional)
 
 ```
 PUT /v1/locations/{location_id}
@@ -196,7 +192,7 @@ PUT /v1/locations/{location_id}
 
 ---
 
-## 5. Versioning
+## 6. Versioning
 
 - Telemetry payload schema is versioned via `schema` (e.g. `measurements.v1`).
 - API endpoints are versioned via the URL prefix (`/v1/...`).
@@ -205,7 +201,7 @@ PUT /v1/locations/{location_id}
 
 ---
 
-## 6. Notes on Duplicates
+## 7. Notes on Duplicates
 
 To support retries safely, the backend SHOULD deduplicate.
 
