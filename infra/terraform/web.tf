@@ -1,58 +1,25 @@
-########################################
-# Inputs
-########################################
-
-variable "zone_name" {
-  type    = string
-  default = "kdorzak.online"
-}
-
-variable "pages_project_name" {
-  type    = string
-  default = "weather-station"
-}
-
 locals {
-  weather_hostname = "weather.${var.zone_name}"
+  weather_hostname = "weather.${data.cloudflare_zone.main.name}"
 }
 
-########################################
-# Zone lookup (v5 compatible)
-########################################
-
-data "cloudflare_zone" "zone" {
-  filter = {
-    name = var.zone_name
-  }
-}
-
-data "cloudflare_pages_project" "web" {
+data "cloudflare_pages_project" "weather_dashboard" {
   account_id    = var.cloudflare_account_id
-  project_name  = var.pages_project_name
+  project_name  = "weather-station-dashboard"
 }
-########################################
-# DNS record for Pages custom domain
-# (Pages will NOT create DNS record automatically)
-########################################
 
 resource "cloudflare_dns_record" "weather" {
-  zone_id  = data.cloudflare_zone.zone.id
-  name     = "weather"
-  type     = "CNAME"
-  content  = "${data.cloudflare_pages_project.web.subdomain}.pages.dev"
-  proxied  = true
-  ttl      = 1 # auto
+  zone_id = data.cloudflare_zone.main.id
+  type    = "CNAME"
+  name    = "weather"
+  content = "${data.cloudflare_pages_project.weather_dashboard.subdomain}.pages.dev"
+  proxied = false
+  ttl     = 1
 }
 
-########################################
-# Attach custom domain to Pages project
-########################################
-
-resource "cloudflare_pages_domain" "weather" {
+resource "cloudflare_pages_domain" "weather_dashboard" {
   account_id   = var.cloudflare_account_id
-  project_name = var.pages_project_name
+  project_name = data.cloudflare_pages_project.weather_dashboard.name
 
-  # v5 uses "name" as the hostname
   name = local.weather_hostname
 
   # ensure DNS exists first

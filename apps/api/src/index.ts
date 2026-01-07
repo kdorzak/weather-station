@@ -1,6 +1,9 @@
 import {
-  ReadingSchema,
-  TelemetryBatchEnvelopeSchema,
+  validateEnvelope,
+  validateReading,
+  type ValidationResult,
+  type TelemetryBatchEnvelope,
+  type Reading,
 } from "@weathera/contracts";
 
 export interface Env {
@@ -30,14 +33,14 @@ const ingest: Handler = async (request) => {
     return json({ status: "error", error: "invalid_payload", message: "Invalid JSON" }, { status: 400 });
   }
 
-  const envelope = TelemetryBatchEnvelopeSchema.safeParse(body);
+  const envelope = validateEnvelope(body);
   if (!envelope.success) {
     return json(
       {
         status: "error",
         error: "invalid_payload",
         message: "Envelope validation failed",
-        details: envelope.error.flatten(),
+        details: envelope.errors,
       },
       { status: 400 }
     );
@@ -45,17 +48,16 @@ const ingest: Handler = async (request) => {
 
   const readings = envelope.data.readings;
   const rejections: { index: number; error: string; message: string }[] = [];
-  const accepted: typeof readings = [];
+  const accepted: Reading[] = [];
 
   readings.forEach((reading, index) => {
-    const result = ReadingSchema.safeParse(reading);
-    if (result.success) {
-      accepted.push(result.data);
-    } else {
+    const result = validateReading(reading);
+    if (result.success) accepted.push(result.data);
+    else {
       rejections.push({
         index,
         error: "invalid_reading",
-        message: result.error.issues.map((i) => i.message).join("; "),
+        message: result.errors.map((i) => `${i.path}: ${i.message}`).join("; "),
       });
     }
   });

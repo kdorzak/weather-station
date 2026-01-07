@@ -13,8 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@weathera/contracts": "file:../../packages/contracts",
-    "zod": "^3.23.8"
+    "@weathera/contracts": "file:../../packages/contracts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
