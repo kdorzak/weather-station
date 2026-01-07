@@ -6,13 +6,19 @@ on:
     paths:
       - "services/api/**"
       - ".github/workflows/api.yml"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api.yml"
 
 concurrency:
   group: api-worker-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  deploy_prod:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -25,13 +31,93 @@ jobs:
           node-version: 22
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install dependencies (api)
         working-directory: services/api
         run: npm ci
 
-      - name: Deploy worker
+      - name: Deploy worker (prod)
         working-directory: services/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
+
+  preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies (api)
+        working-directory: services/api
+        run: npm ci
+
+      - name: Deploy worker (preview)
+        working-directory: services/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          WORKER_NAME="weather-station-api-pr-${{ github.event.pull_request.number }}"
+          echo "WORKER_NAME=$WORKER_NAME" >> "$GITHUB_ENV"
+          npx wrangler deploy --name "$WORKER_NAME"
+
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        env:
+          WORKER_NAME: ${{ env.WORKER_NAME }}
+          WORKERS_SUBDOMAIN: ${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}
+        with:
+          script: |
+            const marker = '<!-- weather-station-api-preview -->';
+            const workerName = process.env.WORKER_NAME;
+            const sub = process.env.WORKERS_SUBDOMAIN;
+
+            if (!workerName) throw new Error('WORKER_NAME missing');
+            if (!sub) throw new Error('CLOUDFLARE_WORKERS_SUBDOMAIN secret missing');
+
+            const url = `https://${workerName}.${sub}.workers.dev/health`;
+
+            const body = `${marker}
+            ✅ **API Preview deployed**
+            - Worker: \`${workerName}\`
+            - URL: ${url}
+            `;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find(c => typeof c.body === 'string' && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
