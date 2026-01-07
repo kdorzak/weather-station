@@ -1,40 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { login } from "../lib/api-client";
+import { useMemo } from "react";
 import {
   Box,
   Card,
   CardContent,
   CardHeader,
-  TextField,
   Button,
-  Alert,
   Stack,
   Typography,
 } from "@mui/material";
 
 const LoginPage = () => {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      await login(email);
-      router.replace("/");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Login failed";
-      setError(message);
-      setLoading(false);
-    }
-  };
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "";
+  const googleUrl = useMemo(() => `${apiBase}/auth/google`, [apiBase]);
 
   return (
     <Box
@@ -46,28 +26,23 @@ const LoginPage = () => {
       }}
     >
       <Card sx={{ width: "100%", maxWidth: 480, boxShadow: 4 }}>
-        <CardHeader title="Login" subheader="Enter an allowlisted email to access the dashboard." />
+        <CardHeader title="Login" subheader="Sign in with Google to access the dashboard." />
         <CardContent>
-          <form onSubmit={onSubmit}>
-            <Stack spacing={2}>
-              <TextField
-                label="Email"
-                type="email"
-                required
-                fullWidth
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <Button type="submit" variant="contained" disabled={loading}>
-                {loading ? "Signing in…" : "Sign in"}
-              </Button>
-              {error && <Alert severity="error">{error}</Alert>}
-              <Typography variant="body2" color="text.secondary">
-                <Link href="/">Back to dashboard</Link>
-              </Typography>
-            </Stack>
-          </form>
+          <Stack spacing={2}>
+            <Button
+              component="a"
+              href={googleUrl}
+              variant="contained"
+              size="large"
+              fullWidth
+              sx={{ py: 1.2 }}
+            >
+              Continue with Google
+            </Button>
+            <Typography variant="body2" color="text.secondary">
+              <Link href="/">Back to dashboard</Link>
+            </Typography>
+          </Stack>
         </CardContent>
       </Card>
     </Box>

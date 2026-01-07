@@ -59,9 +59,11 @@ coverage/
 # Env / secrets
 !.env
 .env.*
+.dev.vars
 !.env.example
 !**/.env
 **/.env.*
+**/.dev.vars
 !**/.env.example
 
 # Package managers

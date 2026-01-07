@@ -2,7 +2,7 @@ import { Env, Handler, json, buildCorsHeaders, withCors } from "./lib/http";
 import { health } from "./routes/health";
 import { ingest } from "./routes/ingest";
 import { chartData } from "./routes/chart-data";
-import { login, me, logout } from "./routes/auth";
+import { login, me, logout, googleAuthStart, googleAuthCallback } from "./routes/auth";
 
 const notFound: Handler = async () =>
   json({ error: "Not Found" }, { status: 404 });
@@ -14,6 +14,8 @@ const route = (pathname: string): Handler => {
   if (pathname === "/auth/login") return login;
   if (pathname === "/auth/me") return me;
   if (pathname === "/auth/logout") return logout;
+  if (pathname === "/auth/google") return googleAuthStart;
+  if (pathname === "/auth/google/callback") return googleAuthCallback;
   return notFound;
 };
 

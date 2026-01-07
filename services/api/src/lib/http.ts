@@ -3,6 +3,9 @@ export interface Env {
   ALLOWLIST_EMAILS?: string; // comma-separated allowlist for dev auth
   FRONTEND_ORIGIN?: string; // e.g. https://weather.kdorzak.online
   COOKIE_DOMAIN?: string; // e.g. .kdorzak.online
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REDIRECT_URI?: string;
 }
 
 export type Handler = (request: Request, env: Env) => Promise<Response>;
