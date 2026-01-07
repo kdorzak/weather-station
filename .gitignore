@@ -59,12 +59,16 @@ coverage/
 # Env / secrets
 !.env
 .env.*
-.dev.vars
 !.env.example
 !**/.env
 **/.env.*
-**/.dev.vars
+
 !**/.env.example
+
+.*.vars
+!.example.vars
+**/.dev.vars
+!**/.example.vars
 
 # Package managers
 .pnpm-store/
