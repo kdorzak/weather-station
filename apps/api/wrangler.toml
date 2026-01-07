@@ -4,12 +4,6 @@ compatibility_date = "2025-01-01"
 workers_dev = true
 account_id = "d6e15ffdcc5bf89b9cc3d37d857ad009"
 
-[env.dev]
-name = "weather-station-api-dev"
-[env.dev.vars]
-ENVIRONMENT = "dev"
-
-[env.prod]
-name = "weather-station-api"
-[env.prod.vars]
-ENVIRONMENT = "prod"
+[[routes]]
+pattern = "api.kdorzak.online"
+custom_domain = true

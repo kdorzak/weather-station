@@ -5,14 +5,17 @@
   "scripts": {
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "dev": "wrangler dev --env dev",
-    "deploy:dev": "wrangler deploy --env dev",
-    "deploy:prod": "wrangler deploy --env prod"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
+  "dependencies": {
+    "@weathera/contracts": "file:../../packages/contracts",
+    "zod": "^3.23.8"
+  },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
