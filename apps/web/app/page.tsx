@@ -1,5 +1,21 @@
 import Link from "next/link";
-import type { TelemetryBatchEnvelope, Reading } from "@weathera/contracts";
+
+type Reading = {
+  ts: string;
+  sensor_key: string;
+  metric: string;
+  unit: string;
+  value: unknown;
+};
+
+type TelemetryBatchEnvelope = {
+  schema: "measurements.v1";
+  device_id: string;
+  sent_at: string;
+  seq?: number;
+  fw?: { name?: string; version?: string };
+  readings: Reading[];
+};
 
 const mockBatch: TelemetryBatchEnvelope = {
   schema: "measurements.v1",
