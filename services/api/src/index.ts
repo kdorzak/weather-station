@@ -21,9 +21,9 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: buildCorsHeaders(request) });
+      return new Response(null, { status: 204, headers: buildCorsHeaders(request, env) });
     }
     const res = await route(url.pathname)(request, env);
-    return withCors(res, request);
+    return withCors(res, request, env);
   },
 };
