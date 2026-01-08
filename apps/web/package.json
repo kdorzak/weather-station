@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "dev": "next",
-    "build": "next build",
+    "build": "NODE_ENV=production next build",
     "start": "serve out",
     "test": "vitest",
     "test:run": "vitest run"
