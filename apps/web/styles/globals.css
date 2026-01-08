@@ -1,12 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 :root {
   color-scheme: light;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 min-h-screen;
+  background-color: rgb(248 250 252);
+  color: rgb(15 23 42);
+  min-height: 100vh;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
 }

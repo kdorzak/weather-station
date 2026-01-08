@@ -69,22 +69,34 @@ export async function reverseGeocode(
   longitude: number
 ): Promise<GeocodeResult | null> {
   try {
-    // Open-Meteo doesn't have reverse geocoding, so we use a simple approach
-    // with their search API by searching for coordinates
+    // Use Nominatim reverse geocoding (OpenStreetMap)
     const response = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${latitude.toFixed(2)},${longitude.toFixed(2)}&count=1&language=en&format=json`
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`
     );
 
-    // If that doesn't work well, we'll just use coordinates as the name
-    // In a production app, you'd use a proper reverse geocoding service
+    if (!response.ok) {
+      throw new Error("Reverse geocode failed");
+    }
+
+    const data = await response.json();
+    const address = data.address || {};
+    return {
+      name:
+        address.road && address.house_number
+          ? `${address.road} ${address.house_number}`
+          : data.display_name?.split(",")[0] ?? `${latitude.toFixed(4)}°N`,
+      country: address.country || "",
+      admin1: address.state || address.region || "",
+      latitude,
+      longitude,
+    };
+  } catch {
     return {
       name: `${latitude.toFixed(4)}°N`,
       country: `${longitude.toFixed(4)}°E`,
       latitude,
       longitude,
     };
-  } catch {
-    return null;
   }
 }
 
@@ -93,23 +105,43 @@ export async function searchLocation(query: string): Promise<GeocodeResult[]> {
   if (!query || query.length < 2) return [];
 
   try {
+    // Try Open-Meteo first
     const response = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en&format=json`
     );
 
-    if (!response.ok) return [];
+    if (response.ok) {
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        return data.results.map((r: any) => ({
+          name: r.name,
+          country: r.country,
+          admin1: r.admin1,
+          latitude: r.latitude,
+          longitude: r.longitude,
+        }));
+      }
+    }
 
-    const data = await response.json();
+    // Fallback to Nominatim (OpenStreetMap) for more detailed addresses
+    const nominatimResponse = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
+    );
 
-    if (!data.results) return [];
+    if (!nominatimResponse.ok) return [];
 
-    return data.results.map((r: any) => ({
-      name: r.name,
-      country: r.country,
-      admin1: r.admin1,
-      latitude: r.latitude,
-      longitude: r.longitude,
-    }));
+    const nominatimData = await nominatimResponse.json();
+
+    return nominatimData.map((r: any) => {
+      const address = r.address || {};
+      return {
+        name: r.display_name.split(",")[0],
+        country: address.country || "",
+        admin1: address.state || address.region || "",
+        latitude: parseFloat(r.lat),
+        longitude: parseFloat(r.lon),
+      };
+    });
   } catch {
     return [];
   }

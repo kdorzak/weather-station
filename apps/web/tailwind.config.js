@@ -8,4 +8,8 @@ module.exports = {
     extend: {},
   },
   plugins: [],
+  // For TailwindCSS v4 compatibility
+  corePlugins: {
+    preflight: true,
+  },
 };
