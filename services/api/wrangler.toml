@@ -3,14 +3,16 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 workers_dev = true
 account_id = "d6e15ffdcc5bf89b9cc3d37d857ad009"
+preview_urls = true
 
 [[routes]]
 pattern = "api.kdorzak.online"
+zone_name = "kdorzak.online"
 custom_domain = true
 
 [vars]
-FRONTEND_ORIGIN = "http://localhost:3000"
-COOKIE_DOMAIN="localhost"
+FRONTEND_ORIGIN = "https://weather.kdorzak.online"
+COOKIE_DOMAIN=".kdorzak.online"
 ALLOWLIST_EMAILS = "krzysztof.dorzak@gmail.com,szwed.marta@gmail.com"
 GOOGLE_CLIENT_ID = "20977228858-lnes4c808trrbug41iohf4ue7hliug06.apps.googleusercontent.com"
-GOOGLE_REDIRECT_URI="http://localhost:8787/auth/google/callback"
+GOOGLE_REDIRECT_URI="https://api.kdorzak.online/auth/google/callback"
