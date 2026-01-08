@@ -157,8 +157,8 @@ export function DailyForecast({ data, loading }: Props) {
                 {day.weatherDescription}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ minWidth: 80, justifyContent: "flex-end" }}>
-                <Typography fontWeight={600}>{formatNumber(day.temperatureMax, 0)}°</Typography>
                 <Typography color="text.secondary">{formatNumber(day.temperatureMin, 0)}°</Typography>
+                <Typography fontWeight={600}>{formatNumber(day.temperatureMax, 0)}°</Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ minWidth: 40 }}>
                 💧{day.precipitationProbability}%

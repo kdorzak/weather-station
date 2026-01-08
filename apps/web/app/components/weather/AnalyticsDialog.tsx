@@ -13,7 +13,6 @@ import {
   Tab,
   Paper,
   CircularProgress,
-  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import {
@@ -29,6 +28,8 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Bar,
+  ReferenceLine,
+  Brush,
 } from "recharts";
 import { fetchAnalyticsData, AnalyticsData, AnalyticsHourly } from "../../lib/open-meteo";
 import { formatNumber } from "../../lib/format";
@@ -113,12 +114,17 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
     onClose();
   };
 
-  // Prepare chart data - sample every 2 hours for cleaner display
-  const chartData = data?.hourly
-    .filter((_, i) => i % 2 === 0)
-    .map((h) => ({
-      time: formatDate(h.time),
+  // Prepare chart data - show all data with proper date/time formatting
+  const chartData = data?.hourly.map((h, index) => {
+    const dataTime = new Date(h.time);
+    const isPast = dataTime < new Date();
+    const dayLabel = dataTime.toLocaleDateString(undefined, { weekday: "short" });
+    const timeLabel = dataTime.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return {
+      index,
+      time: `${dayLabel} ${timeLabel}`,
       fullTime: h.time,
+      isPast,
       temp: h.temperature,
       feels: h.feelsLike,
       dewpoint: h.dewpoint,
@@ -133,7 +139,13 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
       solar: h.solarRadiation,
       soilTemp: h.soilTemperature,
       soilMoist: h.soilMoisture * 100,
-    })) ?? [];
+    };
+  }) ?? [];
+
+  // Find the index closest to "now" for reference line
+  const now = new Date();
+  const nowIndex = chartData.findIndex((d) => !d.isPast);
+  const nowTime = nowIndex >= 0 ? chartData[nowIndex]?.time : null;
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
@@ -169,7 +181,7 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
         {data && !loading && (
           <Stack spacing={2}>
             {/* Summary Stats */}
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
               <SummaryCard label="Min Temp" value={data.summary.tempMin} unit="°" color={COLORS.dewpoint} />
               <SummaryCard label="Max Temp" value={data.summary.tempMax} unit="°" color={COLORS.temperature} />
               <SummaryCard label="Avg Temp" value={data.summary.tempAvg} unit="°" />
@@ -177,6 +189,12 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
               <SummaryCard label="Max Wind" value={data.summary.windMax} unit=" km/h" color={COLORS.wind} />
               <SummaryCard label="Total Precip" value={data.summary.precipTotal} unit=" mm" color={COLORS.precipitation} />
             </Stack>
+            
+            <Paper elevation={0} sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                📅 Timeline: 1 day past → Now → 3 days future | Drag the slider below charts to zoom
+              </Typography>
+            </Paper>
 
             {/* Tabs */}
             <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} variant="scrollable" scrollButtons="auto">
@@ -190,100 +208,160 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
 
             {/* Temperature Chart */}
             <TabPanel value={tabIndex} index={0}>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
                   <YAxis stroke="#9ca3af" fontSize={11} unit="°" />
-                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
                   <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Line type="monotone" dataKey="temp" name="Temperature" stroke={COLORS.temperature} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="feels" name="Feels Like" stroke={COLORS.feelsLike} strokeWidth={2} dot={false} strokeDasharray="5 5" />
-                  <Line type="monotone" dataKey="dewpoint" name="Dewpoint" stroke={COLORS.dewpoint} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="dewpoint" name="Dewpoint (temp where water condenses)" stroke={COLORS.dewpoint} strokeWidth={2} dot={false} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </TabPanel>
 
             {/* Humidity & Clouds Chart */}
             <TabPanel value={tabIndex} index={1}>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
                   <YAxis stroke="#9ca3af" fontSize={11} unit="%" domain={[0, 100]} />
-                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
                   <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Area type="monotone" dataKey="humidity" name="Humidity" stroke={COLORS.humidity} fill={COLORS.humidity} fillOpacity={0.3} />
                   <Area type="monotone" dataKey="clouds" name="Cloud Cover" stroke={COLORS.clouds} fill={COLORS.clouds} fillOpacity={0.3} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </TabPanel>
 
             {/* Wind Chart */}
             <TabPanel value={tabIndex} index={2}>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
                   <YAxis stroke="#9ca3af" fontSize={11} unit=" km/h" />
-                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
                   <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Area type="monotone" dataKey="gusts" name="Gusts" stroke={COLORS.gusts} fill={COLORS.gusts} fillOpacity={0.2} />
                   <Line type="monotone" dataKey="wind" name="Wind Speed" stroke={COLORS.wind} strokeWidth={2} dot={false} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </TabPanel>
 
             {/* UV & Solar Chart */}
             <TabPanel value={tabIndex} index={3}>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
                   <YAxis yAxisId="left" stroke="#9ca3af" fontSize={11} />
                   <YAxis yAxisId="right" orientation="right" stroke="#9ca3af" fontSize={11} unit=" W/m²" />
-                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
                   <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Line yAxisId="left" type="monotone" dataKey="uv" name="UV Index" stroke={COLORS.uv} strokeWidth={2} dot={false} />
                   <Area yAxisId="right" type="monotone" dataKey="solar" name="Solar Radiation" stroke={COLORS.solar} fill={COLORS.solar} fillOpacity={0.3} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </TabPanel>
 
             {/* Precipitation Chart */}
             <TabPanel value={tabIndex} index={4}>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
                   <YAxis yAxisId="left" stroke="#9ca3af" fontSize={11} unit="%" domain={[0, 100]} />
                   <YAxis yAxisId="right" orientation="right" stroke="#9ca3af" fontSize={11} unit=" mm" />
-                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
                   <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Line yAxisId="left" type="monotone" dataKey="precipProb" name="Probability" stroke="#818cf8" strokeWidth={2} dot={false} />
                   <Bar yAxisId="right" dataKey="precip" name="Precipitation" fill={COLORS.precipitation} opacity={0.7} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </TabPanel>
 
             {/* Soil Chart */}
             <TabPanel value={tabIndex} index={5}>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
                   <YAxis yAxisId="left" stroke="#9ca3af" fontSize={11} unit="°" />
                   <YAxis yAxisId="right" orientation="right" stroke="#9ca3af" fontSize={11} unit="%" />
-                  <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
                   <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Line yAxisId="left" type="monotone" dataKey="soilTemp" name="Soil Temp" stroke={COLORS.soil} strokeWidth={2} dot={false} />
                   <Area yAxisId="right" type="monotone" dataKey="soilMoist" name="Soil Moisture" stroke={COLORS.humidity} fill={COLORS.humidity} fillOpacity={0.3} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </TabPanel>
 
             <Typography variant="caption" color="text.secondary" textAlign="center">
-              Data: Open-Meteo · {data.location.timezone} · Last {chartData.length * 2} hours
+              Data: Open-Meteo · {data.location.timezone} · Showing {chartData.length} data points
             </Typography>
           </Stack>
         )}
