@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Box, Button, Grid, Paper, Stack, Typography, Chip } from "@mui/material";
+import { Box, Button, Chip, Paper, Stack, Typography, Link } from "@mui/material";
 import BarChartIcon from "@mui/icons-material/BarChart";
 
 import { useDashboardData } from "./lib/hooks/useDashboardData";
@@ -110,9 +109,15 @@ export default function Dashboard() {
       </Box>
 
       {/* Main Content - Two Column Layout */}
-      <Grid container spacing={2}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: 2,
+        }}
+      >
         {/* Left Column - Current Data */}
-        <Grid item xs={12} md={5} lg={4}>
+        <Box sx={{ flex: { xs: 1, md: "0 0 auto" }, width: { xs: "100%", md: "40%" } }}>
           <Stack spacing={2}>
             {/* Current Weather from Open-Meteo */}
             <CurrentConditions data={current} loading={weatherLoading} />
@@ -120,10 +125,10 @@ export default function Dashboard() {
             {/* Station Readings */}
             <StationReadings data={stationData} loading={stationLoading} />
           </Stack>
-        </Grid>
+        </Box>
 
         {/* Right Column - Forecasts */}
-        <Grid item xs={12} md={7} lg={8}>
+        <Box sx={{ flex: { xs: 1, md: "0 0 auto" }, width: { xs: "100%", md: "60%" } }}>
           <Stack spacing={2}>
             {/* 24-Hour Forecast */}
             <HourlyForecast data={hourly} loading={weatherLoading} />
@@ -131,8 +136,8 @@ export default function Dashboard() {
             {/* 7-Day Forecast */}
             <DailyForecast data={daily} loading={weatherLoading} />
           </Stack>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* Footer */}
       <Box sx={{ pt: 2, borderTop: 1, borderColor: "divider" }}>

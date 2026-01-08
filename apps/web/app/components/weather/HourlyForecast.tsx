@@ -25,12 +25,20 @@ export function HourlyForecast({ data, loading }: Props) {
 
   // Show every 3 hours for cleaner display (8 items for 24h)
   const filtered = data.filter((_, i) => i % 3 === 0).slice(0, 8);
+  const willRain = data.some((h) => h.precipitationProbability > 30 || h.precipitation > 0);
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="caption" color="text.secondary" textTransform="uppercase" sx={{ mb: 1, display: "block" }}>
-        24-Hour Forecast
-      </Typography>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="caption" color="text.secondary" textTransform="uppercase">
+          24-Hour Forecast
+        </Typography>
+        {willRain && (
+          <Typography variant="caption" color="primary" fontWeight={600}>
+            Rain expected in next 24h
+          </Typography>
+        )}
+      </Stack>
 
       <Stack
         direction="row"
@@ -62,7 +70,7 @@ export function HourlyForecast({ data, loading }: Props) {
               {formatNumber(hour.temperature, 0)}°
             </Typography>
             <Typography variant="caption" color="text.secondary" display="block">
-              💧{hour.precipitationProbability}%
+              💧{hour.precipitationProbability}% · {formatNumber(hour.precipitation, 1)} mm
             </Typography>
           </Box>
         ))}
