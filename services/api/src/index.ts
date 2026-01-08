@@ -3,6 +3,7 @@ import { health } from "./routes/health";
 import { ingest } from "./routes/ingest";
 import { chartData } from "./routes/chart-data";
 import { login, me, logout, googleAuthStart, googleAuthCallback } from "./routes/auth";
+import { openMeteoCurrent, openMeteoForecast, openMeteoAnalytics } from "./routes/open-meteo";
 
 const notFound: Handler = async () =>
   json({ error: "Not Found" }, { status: 404 });
@@ -16,6 +17,9 @@ const route = (pathname: string): Handler => {
   if (pathname === "/auth/logout") return logout;
   if (pathname === "/auth/google") return googleAuthStart;
   if (pathname === "/auth/google/callback") return googleAuthCallback;
+  if (pathname === "/external/open-meteo/current") return openMeteoCurrent;
+  if (pathname === "/external/open-meteo/forecast") return openMeteoForecast;
+  if (pathname === "/external/open-meteo/analytics") return openMeteoAnalytics;
   return notFound;
 };
 

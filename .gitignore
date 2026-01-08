@@ -56,6 +56,9 @@ coverage/
 .eslintcache
 **/.eslintcache
 
+.wrangler
+**/.wrangler
+
 # Env / secrets
 !.env
 .env.*

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDashboardData } from "./lib/hooks/useDashboardData";
 import { Skeleton } from "./components/Skeleton";
+import { CurrentWeather } from "./components/CurrentWeather";
+import { DailyForecast, HourlyForecast } from "./components/WeatherForecast";
 import { formatNumber } from "./lib/format";
 import { useEffect } from "react";
 import {
@@ -178,28 +180,59 @@ const Home = () => {
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card>
-            <CardHeader title="Device" subheader="Station metadata" />
-            <CardContent>
-              <Stack spacing={1.5}>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Device ID
-                  </Typography>
-                  <Typography variant="body1">{data.device_id}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Location
-                  </Typography>
-                  <Typography variant="body1">40.713, -74.006</Typography>
-                </Box>
-                <Link href="/about">About this project →</Link>
-              </Stack>
-            </CardContent>
-          </Card>
+          <Stack spacing={2}>
+            <Card>
+              <CardHeader title="Device" subheader="Station metadata" />
+              <CardContent>
+                <Stack spacing={1.5}>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Device ID
+                    </Typography>
+                    <Typography variant="body1">{data.device_id}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Location
+                    </Typography>
+                    <Typography variant="body1">50.0155, 20.0163</Typography>
+                  </Box>
+                  <Link href="/about">About this project →</Link>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Stack>
         </Grid>
       </Grid>
+
+      {/* Open-Meteo Weather Section */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}>
+        <Box>
+          <Typography variant="h5">External Weather Data</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Model-based weather data from Open-Meteo for comparison and forecasting
+          </Typography>
+        </Box>
+        <Link href="/analytics" style={{ textDecoration: "none" }}>
+          <Chip
+            label="📊 Advanced Analytics →"
+            variant="outlined"
+            clickable
+            sx={{ fontWeight: 500 }}
+          />
+        </Link>
+      </Box>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={4}>
+          <CurrentWeather />
+        </Grid>
+        <Grid item xs={12} md={8}>
+          <HourlyForecast />
+        </Grid>
+      </Grid>
+
+      <DailyForecast />
 
       <Card>
         <CardHeader title="Recent readings" subheader="Dummy data served from the API." />

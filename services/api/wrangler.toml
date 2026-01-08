@@ -14,5 +14,5 @@ custom_domain = true
 FRONTEND_ORIGIN = "https://weather.kdorzak.online"
 COOKIE_DOMAIN=".kdorzak.online"
 ALLOWLIST_EMAILS = "krzysztof.dorzak@gmail.com,szwed.marta@gmail.com"
-GOOGLE_CLIENT_ID = "20977228858-lnes4c808trrbug41iohf4ue7hliug06.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = "388445517126-nhd9a41qno3udt2371l0lmbo0kqeskqb.apps.googleusercontent.com"
 GOOGLE_REDIRECT_URI="https://api.kdorzak.online/auth/google/callback"
