@@ -93,6 +93,8 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tabIndex, setTabIndex] = useState(0);
+  const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
+  const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (open && !data) {
@@ -147,6 +149,21 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
   const nowIndex = chartData.findIndex((d) => !d.isPast);
   const nowTime = nowIndex >= 0 ? chartData[nowIndex]?.time : null;
 
+  // Set brush to start at 24th hour (now)
+  useEffect(() => {
+    if (chartData.length > 0 && brushStartIndex === undefined) {
+      setBrushStartIndex(24);
+      setBrushEndIndex(Math.min(96, chartData.length - 1));
+    }
+  }, [chartData.length, brushStartIndex]);
+
+  const handleBrushChange = (data: { startIndex?: number; endIndex?: number }) => {
+    if (data.startIndex !== undefined && data.endIndex !== undefined) {
+      setBrushStartIndex(data.startIndex);
+      setBrushEndIndex(data.endIndex);
+    }
+  };
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
@@ -179,9 +196,9 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
         )}
 
         {data && !loading && (
-          <Stack spacing={2}>
+          <Box sx={{ p: 3 }}>
             {/* Summary Stats */}
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" justifyContent="center">
               <SummaryCard label="Min Temp" value={data.summary.tempMin} unit="°" color={COLORS.dewpoint} />
               <SummaryCard label="Max Temp" value={data.summary.tempMax} unit="°" color={COLORS.temperature} />
               <SummaryCard label="Avg Temp" value={data.summary.tempAvg} unit="°" />
@@ -190,12 +207,6 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
               <SummaryCard label="Total Precip" value={data.summary.precipTotal} unit=" mm" color={COLORS.precipitation} />
             </Stack>
             
-            <Paper elevation={0} sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                📅 Timeline: 1 day past → Now → 3 days future | Drag the slider below charts to zoom
-              </Typography>
-            </Paper>
-
             {/* Tabs */}
             <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} variant="scrollable" scrollButtons="auto">
               <Tab label="Temperature" />
@@ -208,7 +219,8 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
 
             {/* Temperature Chart */}
             <TabPanel value={tabIndex} index={0}>
-              <ResponsiveContainer width="100%" height={320}>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
@@ -227,39 +239,49 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
                     height={30} 
                     stroke="#94a3b8" 
                     fill="#374151"
+                    startIndex={brushStartIndex}
+                    endIndex={brushEndIndex}
+                    onDragEnd={handleBrushChange}
                   />
                 </LineChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </Box>
             </TabPanel>
 
             {/* Humidity & Clouds Chart */}
             <TabPanel value={tabIndex} index={1}>
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
-                  <YAxis stroke="#9ca3af" fontSize={11} unit="%" domain={[0, 100]} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
-                    labelFormatter={(value) => value}
-                  />
-                  <Legend />
-                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
-                  <Area type="monotone" dataKey="humidity" name="Humidity" stroke={COLORS.humidity} fill={COLORS.humidity} fillOpacity={0.3} />
-                  <Area type="monotone" dataKey="clouds" name="Cloud Cover" stroke={COLORS.clouds} fill={COLORS.clouds} fillOpacity={0.3} />
-                  <Brush 
-                    dataKey="time" 
-                    height={30} 
-                    stroke="#94a3b8" 
-                    fill="#374151"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
+                    <YAxis stroke="#9ca3af" fontSize={11} unit="%" domain={[0, 100]} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                      labelFormatter={(value) => value}
+                    />
+                    <Legend />
+                    {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
+                    <Area type="monotone" dataKey="humidity" name="Humidity" stroke={COLORS.humidity} fill={COLORS.humidity} fillOpacity={0.3} />
+                    <Area type="monotone" dataKey="clouds" name="Cloud Cover" stroke={COLORS.clouds} fill={COLORS.clouds} fillOpacity={0.3} />
+                    <Brush 
+                      dataKey="time" 
+                      height={30} 
+                      stroke="#94a3b8" 
+                      fill="#374151"
+                      startIndex={brushStartIndex}
+                      endIndex={brushEndIndex}
+                      onDragEnd={handleBrushChange}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Box>
             </TabPanel>
 
             {/* Wind Chart */}
             <TabPanel value={tabIndex} index={2}>
-              <ResponsiveContainer width="100%" height={320}>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
@@ -277,14 +299,19 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
                     height={30} 
                     stroke="#94a3b8" 
                     fill="#374151"
+                    startIndex={brushStartIndex}
+                    endIndex={brushEndIndex}
+                    onDragEnd={handleBrushChange}
                   />
                 </ComposedChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </Box>
             </TabPanel>
 
             {/* UV & Solar Chart */}
             <TabPanel value={tabIndex} index={3}>
-              <ResponsiveContainer width="100%" height={320}>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
@@ -303,14 +330,19 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
                     height={30} 
                     stroke="#94a3b8" 
                     fill="#374151"
+                    startIndex={brushStartIndex}
+                    endIndex={brushEndIndex}
+                    onDragEnd={handleBrushChange}
                   />
                 </ComposedChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </Box>
             </TabPanel>
 
             {/* Precipitation Chart */}
             <TabPanel value={tabIndex} index={4}>
-              <ResponsiveContainer width="100%" height={320}>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
@@ -329,14 +361,19 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
                     height={30} 
                     stroke="#94a3b8" 
                     fill="#374151"
+                    startIndex={brushStartIndex}
+                    endIndex={brushEndIndex}
+                    onDragEnd={handleBrushChange}
                   />
                 </ComposedChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </Box>
             </TabPanel>
 
             {/* Soil Chart */}
             <TabPanel value={tabIndex} index={5}>
-              <ResponsiveContainer width="100%" height={320}>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
@@ -355,15 +392,29 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
                     height={30} 
                     stroke="#94a3b8" 
                     fill="#374151"
+                    startIndex={brushStartIndex}
+                    endIndex={brushEndIndex}
+                    onDragEnd={handleBrushChange}
                   />
                 </ComposedChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </Box>
             </TabPanel>
 
-            <Typography variant="caption" color="text.secondary" textAlign="center">
-              Data: Open-Meteo · {data.location.timezone} · Showing {chartData.length} data points
-            </Typography>
-          </Stack>
+            <Stack direction="row" justifyContent="center">
+              <Paper elevation={0} sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
+                <Typography variant="caption" color="text.secondary" textAlign="center">
+                  📅 Timeline: 1 day past → Now → 3 days future | Drag the slider below charts to zoom
+                </Typography>
+              </Paper>
+            </Stack>
+            
+            <Stack direction="row" justifyContent="center" sx={{ mt: 1 }}>
+              <Typography variant="caption" color="text.secondary" textAlign="center">
+                Data: Open-Meteo · {data.location.timezone} · Showing {chartData.length} data points
+              </Typography>
+            </Stack>
+          </Box>
         )}
       </DialogContent>
     </Dialog>
