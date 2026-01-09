@@ -11,6 +11,7 @@ import { useLocation } from "./lib/hooks/useLocation";
 import { Skeleton } from "./components/Skeleton";
 import { StationReadings } from "./components/station";
 import { CurrentConditions, HourlyForecast, DailyForecast, AnalyticsDialog } from "./components/weather";
+import { WeatherAlerts } from "./components/weather/WeatherAlerts";
 import { LocationSelector } from "./components/LocationSelector";
 
 function LoadingState() {
@@ -107,6 +108,9 @@ export default function Dashboard() {
           </Button>
         </Stack>
       </Box>
+
+      {/* Weather Alerts */}
+      <WeatherAlerts country="poland" />
 
       {/* Main Content - Two Column Layout */}
       <Box
