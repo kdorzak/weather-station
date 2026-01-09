@@ -31,7 +31,8 @@ import {
   ReferenceLine,
   Brush,
 } from "recharts";
-import { fetchAnalyticsData, AnalyticsData, AnalyticsHourly } from "../../lib/open-meteo";
+import { useAnalytics } from "../../lib/hooks/useAnalytics";
+import { AnalyticsData, AnalyticsHourly } from "../../lib/analytics";
 import { formatNumber } from "../../lib/format";
 
 interface Props {
@@ -164,28 +165,17 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 }
 
 export function AnalyticsDialog({ open, onClose, latitude, longitude, locationName }: Props) {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refresh } = useAnalytics(latitude, longitude, 3, 1);
   const [tabIndex, setTabIndex] = useState(0);
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
 
-  useEffect(() => {
-    if (open && !data) {
-      setLoading(true);
-      setError(null);
-      fetchAnalyticsData(latitude, longitude, 3, 1)
-        .then(setData)
-        .catch((err) => setError(err.message))
-        .finally(() => setLoading(false));
-    }
-  }, [open, latitude, longitude, data]);
-
   // Reset data when location changes
   useEffect(() => {
-    setData(null);
-  }, [latitude, longitude]);
+    if (open) {
+      refresh();
+    }
+  }, [open, latitude, longitude, refresh]);
 
   const handleClose = () => {
     onClose();

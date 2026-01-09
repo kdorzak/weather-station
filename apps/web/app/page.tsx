@@ -12,6 +12,7 @@ import { Skeleton } from "./components/Skeleton";
 import { StationReadings } from "./components/station";
 import { CurrentConditions, HourlyForecast, DailyForecast, AnalyticsDialog } from "./components/weather";
 import { WeatherAlerts } from "./components/weather/WeatherAlerts";
+import { AlertSummary } from "./components/weather/AlertSummary";
 import { LocationSelector } from "./components/LocationSelector";
 
 function LoadingState() {
@@ -110,6 +111,7 @@ export default function Dashboard() {
       </Box>
 
       {/* Weather Alerts */}
+      <AlertSummary country="poland" />
       <WeatherAlerts country="poland" />
 
       {/* Main Content - Two Column Layout */}

@@ -1,33 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Box, Paper, Typography, Stack, Chip, IconButton, Collapse } from "@mui/material";
+import { useState } from "react";
+import { Box, Paper, Typography, Stack, Chip, IconButton, Collapse, Button } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import { fetchMeteoAlarmAlerts, MeteoAlarmAlert } from "../../lib/open-meteo";
+import { useWeatherAlerts } from "../../lib/hooks/useWeatherAlerts";
 
 interface Props {
   country?: string;
 }
 
 export function WeatherAlerts({ country = "poland" }: Props) {
-  const [alerts, setAlerts] = useState<MeteoAlarmAlert[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { alerts, activeAlerts, loading, error, hasActiveAlerts, refresh } = useWeatherAlerts(country);
   const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const loadAlerts = async () => {
-      setLoading(true);
-      const data = await fetchMeteoAlarmAlerts(country);
-      setAlerts(data);
-      setLoading(false);
-    };
-
-    loadAlerts();
-    // Refresh alerts every 15 minutes
-    const interval = setInterval(loadAlerts, 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [country]);
 
   const toggleExpand = (alertId: string) => {
     setExpandedAlerts((prev) => {
@@ -44,20 +30,43 @@ export function WeatherAlerts({ country = "poland" }: Props) {
   if (loading) {
     return (
       <Paper sx={{ p: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          Ładowanie ostrzeżeń meteorologicznych...
-        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="caption" color="text.secondary">
+            Ładowanie ostrzeżeń meteorologicznych...
+          </Typography>
+          <IconButton size="small" onClick={refresh} disabled>
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Stack>
       </Paper>
     );
   }
 
-  if (alerts.length === 0) {
+  if (error) {
+    return (
+      <Paper sx={{ p: 2, bgcolor: "error.light" }}>
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+          <Typography variant="body2" sx={{ color: "error.dark" }}>
+            ❌ Błąd ładowania ostrzeżeń: {error}
+          </Typography>
+          <IconButton size="small" onClick={refresh} sx={{ color: "error.dark" }}>
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  if (!hasActiveAlerts) {
     return (
       <Paper sx={{ p: 2, bgcolor: "success.light" }}>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
           <Typography variant="body2" sx={{ color: "success.dark" }}>
             ✅ Brak aktywnych ostrzeżeń meteorologicznych
           </Typography>
+          <IconButton size="small" onClick={refresh} sx={{ color: "success.dark" }}>
+            <RefreshIcon fontSize="small" />
+          </IconButton>
         </Stack>
       </Paper>
     );
@@ -65,10 +74,15 @@ export function WeatherAlerts({ country = "poland" }: Props) {
 
   return (
     <Stack spacing={1}>
-      <Typography variant="subtitle2" color="text.secondary" sx={{ px: 1 }}>
-        Ostrzeżenia MeteoAlarm ({alerts.length})
-      </Typography>
-      {alerts.map((alert) => {
+      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ px: 1 }}>
+        <Typography variant="subtitle2" color="text.secondary">
+          Ostrzeżenia MeteoAlarm ({activeAlerts.length})
+        </Typography>
+        <IconButton size="small" onClick={refresh} sx={{ color: "text.secondary" }}>
+          <RefreshIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+      {activeAlerts.map((alert) => {
         const isExpanded = expandedAlerts.has(alert.id);
         const expiresDate = new Date(alert.expires);
         const isExpired = expiresDate < new Date();
