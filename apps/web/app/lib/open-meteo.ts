@@ -273,6 +273,9 @@ export interface AnalyticsHourly {
   solarRadiation: number;
   soilTemperature: number;
   soilMoisture: number;
+  // Biomet data
+  wetBulbTemp: number;
+  vapourPressureDeficit: number;
 }
 
 export interface AnalyticsData {
@@ -316,6 +319,8 @@ interface OpenMeteoAnalyticsResponse {
     shortwave_radiation: number[];
     soil_temperature_0cm: number[];
     soil_moisture_0_to_1cm: number[];
+    wet_bulb_temperature_2m: number[];
+    vapour_pressure_deficit: number[];
   };
 }
 
@@ -344,6 +349,8 @@ export async function fetchAnalyticsData(
       "shortwave_radiation",
       "soil_temperature_0cm",
       "soil_moisture_0_to_1cm",
+      "wet_bulb_temperature_2m",
+      "vapour_pressure_deficit",
     ].join(","),
     timezone: "auto",
     forecast_days: days.toString(),
@@ -376,6 +383,8 @@ export async function fetchAnalyticsData(
     solarRadiation: h.shortwave_radiation[i],
     soilTemperature: h.soil_temperature_0cm[i],
     soilMoisture: h.soil_moisture_0_to_1cm[i],
+    wetBulbTemp: h.wet_bulb_temperature_2m[i],
+    vapourPressureDeficit: h.vapour_pressure_deficit[i],
   }));
 
   // Calculate summary stats

@@ -55,6 +55,8 @@ const COLORS = {
   precipitation: "#6366f1",
   clouds: "#94a3b8",
   soil: "#a16207",
+  wetBulb: "#0ea5e9",
+  vpd: "#d946ef",
 };
 
 const formatTime = (time: string) => {
@@ -66,6 +68,79 @@ const formatDate = (time: string) => {
   const d = new Date(time);
   return d.toLocaleDateString(undefined, { weekday: "short", hour: "2-digit" });
 };
+
+// Biomet condition calculator based on temperature, humidity, wind, and pressure
+type BiometCondition = {
+  level: number; // 1-6 (1=very favorable, 6=very unfavorable)
+  label: string;
+  labelPL: string;
+  color: string;
+  bgColor: string;
+};
+
+function calculateBiometCondition(
+  temp: number,
+  humidity: number,
+  wind: number,
+  pressure: number,
+  feelsLike: number
+): BiometCondition {
+  let score = 0;
+  
+  // Temperature stress (optimal 18-24°C)
+  if (temp >= 18 && temp <= 24) score += 0;
+  else if (temp >= 15 && temp < 18) score += 1;
+  else if (temp > 24 && temp <= 28) score += 1;
+  else if (temp >= 10 && temp < 15) score += 2;
+  else if (temp > 28 && temp <= 32) score += 2;
+  else if (temp >= 5 && temp < 10) score += 3;
+  else if (temp > 32 && temp <= 36) score += 3;
+  else if (temp < 5 || temp > 36) score += 4;
+  
+  // Humidity stress (optimal 40-60%)
+  if (humidity >= 40 && humidity <= 60) score += 0;
+  else if (humidity >= 30 && humidity < 40) score += 0.5;
+  else if (humidity > 60 && humidity <= 70) score += 0.5;
+  else if (humidity >= 20 && humidity < 30) score += 1;
+  else if (humidity > 70 && humidity <= 80) score += 1;
+  else if (humidity < 20 || humidity > 80) score += 2;
+  
+  // Wind stress (optimal < 15 km/h)
+  if (wind < 15) score += 0;
+  else if (wind >= 15 && wind < 30) score += 0.5;
+  else if (wind >= 30 && wind < 50) score += 1;
+  else if (wind >= 50) score += 2;
+  
+  // Pressure change stress (simplified - based on absolute value)
+  if (pressure >= 1010 && pressure <= 1025) score += 0;
+  else if (pressure >= 1000 && pressure < 1010) score += 0.5;
+  else if (pressure > 1025 && pressure <= 1035) score += 0.5;
+  else score += 1;
+  
+  // Feels like difference (thermal stress)
+  const thermalDiff = Math.abs(temp - feelsLike);
+  if (thermalDiff < 3) score += 0;
+  else if (thermalDiff >= 3 && thermalDiff < 6) score += 0.5;
+  else if (thermalDiff >= 6 && thermalDiff < 10) score += 1;
+  else score += 2;
+  
+  // Map score to condition level
+  if (score <= 1) return { level: 1, label: "Favorable", labelPL: "Korzystne", color: "#166534", bgColor: "#86efac" };
+  if (score <= 2.5) return { level: 2, label: "Mostly favorable", labelPL: "Umiarkowanie korzystne", color: "#3f6212", bgColor: "#bef264" };
+  if (score <= 4) return { level: 3, label: "Neutral", labelPL: "Obojętne", color: "#525252", bgColor: "#e5e5e5" };
+  if (score <= 5.5) return { level: 4, label: "Slightly unfavorable", labelPL: "Umiarkowanie niekorzystne", color: "#9a3412", bgColor: "#fed7aa" };
+  if (score <= 7) return { level: 5, label: "Unfavorable", labelPL: "Niekorzystne", color: "#b91c1c", bgColor: "#fca5a5" };
+  return { level: 6, label: "Very unfavorable", labelPL: "Bardzo niekorzystne", color: "#7f1d1d", bgColor: "#ef4444" };
+}
+
+const BIOMET_LEGEND = [
+  { level: 1, label: "Favorable", labelPL: "Korzystne", color: "#166534", bgColor: "#86efac" },
+  { level: 2, label: "Mostly favorable", labelPL: "Umiarkowanie korzystne", color: "#3f6212", bgColor: "#bef264" },
+  { level: 3, label: "Neutral", labelPL: "Obojętne", color: "#525252", bgColor: "#e5e5e5" },
+  { level: 4, label: "Slightly unfavorable", labelPL: "Umiarkowanie niekorzystne", color: "#9a3412", bgColor: "#fed7aa" },
+  { level: 5, label: "Unfavorable", labelPL: "Niekorzystne", color: "#b91c1c", bgColor: "#fca5a5" },
+  { level: 6, label: "Very unfavorable", labelPL: "Bardzo niekorzystne", color: "#7f1d1d", bgColor: "#ef4444" },
+];
 
 function SummaryCard({ label, value, unit, color }: { label: string; value: number; unit: string; color?: string }) {
   return (
@@ -141,6 +216,9 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
       solar: h.solarRadiation,
       soilTemp: h.soilTemperature,
       soilMoist: h.soilMoisture * 100,
+      wetBulb: h.wetBulbTemp,
+      vpd: h.vapourPressureDeficit,
+      biometCondition: calculateBiometCondition(h.temperature, h.humidity, h.windSpeed, h.pressure, h.feelsLike),
     };
   }) ?? [];
 
@@ -215,6 +293,7 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
               <Tab label="UV & Solar" />
               <Tab label="Precipitation" />
               <Tab label="Soil" />
+              <Tab label="Biomet" />
             </Tabs>
 
             {/* Temperature Chart */}
@@ -387,6 +466,89 @@ export function AnalyticsDialog({ open, onClose, latitude, longitude, locationNa
                   {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
                   <Line yAxisId="left" type="monotone" dataKey="soilTemp" name="Soil Temp" stroke={COLORS.soil} strokeWidth={2} dot={false} />
                   <Area yAxisId="right" type="monotone" dataKey="soilMoist" name="Soil Moisture" stroke={COLORS.humidity} fill={COLORS.humidity} fillOpacity={0.3} />
+                  <Brush 
+                    dataKey="time" 
+                    height={30} 
+                    stroke="#94a3b8" 
+                    fill="#374151"
+                    startIndex={brushStartIndex}
+                    endIndex={brushEndIndex}
+                    onDragEnd={handleBrushChange}
+                  />
+                </ComposedChart>
+                </ResponsiveContainer>
+              </Box>
+            </TabPanel>
+
+            {/* Biomet Chart */}
+            <TabPanel value={tabIndex} index={6}>
+              <Box sx={{ width: "100%", maxWidth: 800, mx: "auto" }}>
+                {/* Current Biomet Condition */}
+                {nowIndex >= 0 && chartData[nowIndex] && (
+                  <Paper 
+                    elevation={0} 
+                    sx={{ 
+                      p: 2, 
+                      mb: 2, 
+                      bgcolor: chartData[nowIndex].biometCondition.bgColor,
+                      borderRadius: 2,
+                      textAlign: "center"
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ color: chartData[nowIndex].biometCondition.color, fontWeight: 600 }}>
+                      Warunki biometeorologiczne teraz
+                    </Typography>
+                    <Typography variant="h5" sx={{ color: chartData[nowIndex].biometCondition.color, fontWeight: 700 }}>
+                      {chartData[nowIndex].biometCondition.labelPL}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: chartData[nowIndex].biometCondition.color }}>
+                      ({chartData[nowIndex].biometCondition.label})
+                    </Typography>
+                  </Paper>
+                )}
+
+                {/* Legend */}
+                <Paper elevation={0} sx={{ p: 1.5, mb: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, fontWeight: 600 }}>
+                    Skala warunków biometeorologicznych:
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap justifyContent="center">
+                    {BIOMET_LEGEND.map((item) => (
+                      <Box 
+                        key={item.level} 
+                        sx={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: 0.5,
+                          px: 1,
+                          py: 0.5,
+                        }}
+                      >
+                        <Box sx={{ width: 16, height: 16, bgcolor: item.bgColor, borderRadius: 0.5, border: "1px solid", borderColor: item.color }} />
+                        <Typography variant="caption" sx={{ color: item.color, fontSize: 10 }}>
+                          {item.labelPL}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Paper>
+
+                <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="time" stroke="#9ca3af" fontSize={10} interval="preserveStartEnd" />
+                  <YAxis yAxisId="left" stroke="#9ca3af" fontSize={11} unit="°" />
+                  <YAxis yAxisId="right" orientation="right" stroke="#9ca3af" fontSize={11} unit=" kPa" />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: 8 }}
+                    labelFormatter={(value) => value}
+                  />
+                  <Legend />
+                  {nowTime && <ReferenceLine x={nowTime} stroke="#22c55e" strokeWidth={2} label={{ value: "Now", fill: "#22c55e", fontSize: 10 }} />}
+                  <Line yAxisId="left" type="monotone" dataKey="temp" name="Temperature" stroke={COLORS.temperature} strokeWidth={2} dot={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="feels" name="Feels Like" stroke={COLORS.feelsLike} strokeWidth={2} dot={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="wetBulb" name="Wet Bulb Temp" stroke={COLORS.wetBulb} strokeWidth={2} dot={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="vpd" name="VPD (Vapour Pressure Deficit)" stroke={COLORS.vpd} strokeWidth={2} dot={false} />
                   <Brush 
                     dataKey="time" 
                     height={30} 
